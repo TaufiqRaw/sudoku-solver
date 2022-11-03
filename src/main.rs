@@ -8,18 +8,21 @@ const FILLED : u8 = 255;
 fn main() {
     let mut done_flag = false;
     let mut main_array : [u8; SUDOKU_FRAME] = [
-            0, 0, 0, 0, 0, 0, 0, 1, 2,
-            0, 0, 0, 0, 3, 5, 0, 0, 0,
-            0, 0, 0, 6, 0, 0, 0, 7, 0,
-            7, 0, 0, 0, 0, 0, 3, 0, 0,
-            0, 0, 0, 4, 0, 0, 8, 0, 0,
-            1, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 1, 2, 0, 0, 0, 0,
-            0, 8, 0, 0, 0, 0, 0, 4, 0,
-            0, 5, 0, 0, 0, 0, 6, 0, 0,
+            0, 0, 1, 0, 0, 0, 9, 0, 0,
+            0, 7, 0, 0, 0, 8, 4, 3, 0,
+            8, 0, 0, 6, 0, 0, 0, 0, 0,
+            0, 0, 2, 0, 1, 0, 0, 0, 0,
+            0, 4, 0, 0, 0, 6, 8, 7, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 5,
+            0, 0, 4, 2, 0, 0, 3, 5, 0,
+            0, 5, 0, 0, 0, 0, 0, 0, 6,
+            0, 0, 0, 0, 0, 3, 0, 0, 9,
         ];
 
-    solve(&mut main_array, 0, &mut done_flag);
+    let row_potentials = get_row_potentials(&mut main_array, 0).expect("cant find first row potential, aborting operation");
+    let most_constrained_cols = get_min_index(&row_potentials);
+
+    solve(&mut main_array, most_constrained_cols, &mut done_flag);
 
     for i in 0 .. 9{
         println!("{:?}", &main_array[0 + (i * 9) .. 9 + (i * 9)]);
@@ -28,11 +31,15 @@ fn main() {
 
 fn solve(array : &mut [u8], position : usize, done_flag : &mut bool){
     let row: usize = (position as f64 / 9.0).floor() as usize;
-    let candidate = get_candidate(array, position).expect("No more valid candidate");
+    let candidate = match get_candidate(array, position) {
+        Ok(candidate) => candidate,
+        _ => return,
+    };
 
     if *done_flag {
         return;
     }
+
     
     for item in &candidate {
         array[position] = *item;
@@ -51,13 +58,26 @@ fn solve(array : &mut [u8], position : usize, done_flag : &mut bool){
         };
         let most_constrained_cols = get_min_index(&row_potentials);
 
+        //TODO: not use index 1 on new row
         if is_filled(&array[0 + (row * 9) .. 9 + (row * 9)]) {
             if row+1 >= SUDOKU_COLS {
                 *done_flag = true;
                 return ();
             }
             
-            let arr_pos = (row+1) * SUDOKU_COLS;
+            let row_potentials = get_row_potentials(array, row+1);
+            let row_potentials = match row_potentials {
+                Err(_) => {
+                    if *done_flag {
+                        return;
+                    }
+                    array[position] = 0;
+                    return;
+                },
+                Ok(data) => data
+            };
+
+            let arr_pos = (row+1) * SUDOKU_COLS + get_min_index(&row_potentials);
             solve(array, arr_pos, done_flag);
 
             if *done_flag {
@@ -100,6 +120,7 @@ fn get_row_potentials(sudoku_array : &mut [u8], row : usize)-> Result<[u8; SUDOK
         let candidate = get_candidate(sudoku_array, get_index(col, row))?;
         row_potentials[col] = candidate.len() as u8;
     };
+
     Ok(row_potentials)
 }
 
